@@ -1,0 +1,1 @@
+.Polaris-MediaCard__MediaContainer:not(.Polaris-MediaCard--portrait), .Polaris-MediaCard__InfoContainer:not(.Polaris-MediaCard--portrait){ flex-basis:unset !important;}

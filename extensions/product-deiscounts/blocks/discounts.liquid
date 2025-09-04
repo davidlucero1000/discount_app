@@ -1,0 +1,319 @@
+{{ "product-discounts.css" | asset_url | stylesheet_tag }}
+<script type="text/javascript" src="https://cdn.shopify.com/s/javascripts/currencies.js" async></script>
+
+<style>
+  .app-product-discounts .product-deiscount-wrapper{
+    background-color: {{ block.settings.bg_color }};
+  }
+
+  .app-product-discounts .product-deiscount-wrapper .product-discounts__title{
+    color: {{ block.settings.title_color }};
+  }
+
+  .app-product-discounts .discount-accordions .accordion-item .accordion-header {
+    background-color: {{ block.settings.li_bg_color }};
+    color: {{ block.settings.text_color }};
+  }
+
+  .app-product-discounts .discount-accordions .accordion-item .accordion-header:hover {
+    background-color: {{ block.settings.li_bg_hover_color }};
+  }
+
+</style>
+
+
+<div class="product-deiscount-wrapper {{ block.settings.color_scheme }}">
+  <h3 class="product-discounts__title">{{ block.settings.title }}</h3>
+  <ul class="discount-accordions">    
+  </ul>
+</div>
+
+{% assign collections = "" %}
+{% for collection in product.collections %}
+  {% if collections == "" %}
+    {% assign collections = "gid://shopify/Collection/" | append: collection.id %}
+  {% else %}
+    {% assign collections = collections | append:', gid://shopify/Collection/' | append: collection.id %}
+  {% endif %}  
+{% endfor %}
+
+
+<script>
+
+  document.addEventListener("DOMContentLoaded", () => {
+
+      fetch(`https://jaydeep-dev-store.myshopify.com//apps/discounts`,{
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          productId: "gid://shopify/Product/{{ product.id }}",
+          variantId: "gid://shopify/ProductVariant/{{ product.selected_or_first_available_variant.id }}",
+          collections: "{{ collections }}", 
+        })
+      }).then(response => {
+        if (!response.ok) throw new Error("Network response was not ok");
+        return response.json();
+      })
+      .then(data => {
+        const storeCurrency = window.Shopify.currency.active || 'USD';
+        const store_url =  window.location.origin;
+        const discountContainer = document.querySelector(".app-product-discounts .discount-accordions");
+        discountContainer.innerHTML = ""; // Clear existing content
+        if(data?.discounts && data.discounts.length > 0) {
+          data.discounts.forEach(discount => {
+            let li = document.createElement("li");
+            li.className = "accordion-item";
+
+            let template = `<button class="accordion-header">`;
+
+            if(discount.type == "ManualDiscountCodeBasic"){
+              template += `<span>Manual Basic Discount (${discount.title})</span>`;
+            }
+
+            if(discount.type == "AutomaticDiscountCodeBasic"){
+              template += `<span>Automatic Basic Discount</span>`;
+            }
+
+            if(discount.type == "ManualDiscountCodeBxgy"){
+              template += `<span>Manual BxGy Discount (${discount.title})</span>`;
+            }
+
+            if(discount.type == "AutomaticDiscountCodeBxgy"){
+              template += `<span>Automatic BxGy Discount</span>`;
+            }
+
+            template += `<p>`;
+
+            let orignalPrice = {{ product.selected_or_first_available_variant.price | money_without_currency }};
+            let discountedPrice = 0;
+
+            if(discount.customerGets.value.DiscountAmount.amount != null){
+              if(storeCurrency != discount.customerGets.value.DiscountAmount.currencyCode){
+                discountedPrice = orignalPrice - Currency.convert(discount.discountedPrice, discount.customerGets.value.DiscountAmount.currencyCode, storeCurrency);
+              }else{
+                discountedPrice = orignalPrice - discount.discountedPrice;
+              }
+              template += `<strong>${getCurrencySymbol(discount.customerGets.value.DiscountAmount.currencyCode)} ${Currency.convert(discount.customerGets.value.DiscountAmount.amount, discount.customerGets.value.DiscountAmount.currencyCode, storeCurrency)} off </strong>`;
+            } 
+
+            if(discount.customerGets.value.percentage != null){
+              discountedPrice = orignalPrice - (orignalPrice * discount.customerGets.value.percentage);
+              template += `<strong>${discount.customerGets.value.percentage*100}% off </strong>`;
+            } 
+            
+            if(discount.customerGets.value.DiscountOnQuantity.quantity != null){
+              if(discount.customerGets.value.DiscountOnQuantity.DiscountAmount.amount != null){
+                if(storeCurrency != discount.customerGets.value.DiscountAmount.currencyCode){
+                  discountedPrice = orignalPrice - Currency.convert(discount.customerGets.value.DiscountOnQuantity.DiscountAmount.amount, discount.customerGets.value.DiscountAmount.currencyCode, storeCurrency);
+                }else{
+                  discountedPrice = orignalPrice - discount.customerGets.value.DiscountOnQuantity.DiscountAmount.amount;
+                }
+                template += `<strong>${getCurrencySymbol(discount.customerGets.value.DiscountAmount.currencyCode)} ${Currency.convert(discount.customerGets.value.DiscountAmount.amount, discount.customerGets.value.DiscountAmount.currencyCode, storeCurrency)} off </strong>`;
+              }
+              
+              if(discount.customerGets.value.DiscountOnQuantity.DiscountPercentage.percentage != null){
+                discountedPrice = orignalPrice - (orignalPrice * discount.customerGets.value.DiscountOnQuantity.DiscountPercentage.percentage);
+                template += `<strong>${discount.customerGets.value.DiscountOnQuantity.DiscountPercentage.percentage*100}% off </strong>`;
+              }
+              
+            } 
+            
+            template += `<span class="accordion-icon">+</span></p></button>`;
+            
+            template += `<div class="accordion-content">`;
+
+            if(discount.type == "ManualDiscountCodeBasic" || discount.type == "ManualDiscountCodeBxgy"){
+              template += `<p><strong>Discount Code: </strong> ${discount.title}</p>`;
+            }
+            
+            if(discount.startAt != null){
+              template += `<p><strong>Start At: </strong> ${new Date(discount.startAt).toLocaleDateString()}</p>`; 
+            }
+            
+            if(discount.endAt != null){
+              template += `<p><strong>End At: </strong> ${new Date(discount.endAt).toLocaleDateString()}</p>`;
+            }
+
+            if(discount.minimumRequirement?.greaterThanOrEqualToQuantity != null || discount.minimumRequirement?.greaterThanOrEqualToSubtotal.amount != null){
+              template += `<p><strong>Minimum Requirement:</strong> `;
+              if(discount.minimumRequirement.greaterThanOrEqualToQuantity != null){
+                template += `${discount.minimumRequirement.greaterThanOrEqualToQuantity} items into cart`;
+              }
+              if(discount.minimumRequirement.greaterThanOrEqualToAmount != null){
+                template += `${getCurrencySymbol(discount.minimumRequirement.greaterThanOrEqualToAmount.currencyCode)} ${discount.minimumRequirement.greaterThanOrEqualToAmount.amount} cart total`;
+              }
+              template += `</p>`;
+              
+            }
+            
+            if(discount.type == "ManualDiscountCodeBxgy" || discount.type == "AutomaticDiscountCodeBxgy"){
+           
+              if(discount.customerBuys != null){
+                if(discount.customerBuys.items.allItems){
+                  template += `<p><strong>Customer Buys any item </strong></p>`;
+                }else{
+                  if(discount.customerBuys.items.collections != null){
+                    template += `<p><strong>Customer Buys any item from collections </strong></p>`;                   
+                    template += `<ul class="collections-list">`; 
+                    discount.customerBuys.items.collections.forEach(collection => {
+                      template += `<li><a href="${store_url}/collections/${collection.node.handle}" target="_blank">`;
+                      if(collection.node.image != null){
+                        template += `<img src="${collection.node.image.url}" alt="${collection.node.title }">`;
+                      }else{
+                        template += `<img src="{{ 'collection.jpg' | asset_url }}" alt="${collection.node.title }">`;
+                      }                                  
+                                      
+                      template +=`<span>${collection.node.title}</span>
+                      </a></li>`;
+                    });
+                     template += `</ul>`; 
+                  }
+
+                  if(discount.customerBuys.items.products != null){
+                    template += `<p><strong>Customer Buys any item from products </strong></p>`;
+                    template += `<ul class="products-list">`; 
+                    discount.customerBuys.items.products.forEach(product => {                    
+                      template += `<li><a href="${store_url}/products/${product.node.handle}" target="_blank">`;
+                      if(product.node.featuredMedia != null){
+                        template += `<img src="${product.node.featuredMedia.preview.image.url}" alt="${product.node.title }">`;
+                      }else{
+                        template += `<img src="{{ 'product.jpg' | asset_url }}" alt="${product.node.title }">`;
+                      }                                  
+                                      
+                      template +=`<span>${product.node.title}</span>
+                      </a></li>`;                     
+                    });
+                    template += `</ul>`; 
+                  }
+                }
+
+              
+
+              }
+             
+            }else{
+              let youSave = orignalPrice - discountedPrice;
+              if(discount.customerGets.appliesOnOneTimePurchase){
+                template += `<p><strong>Uses: </strong>One time only ! </p>`;
+              }
+              template += `<p><strong>Original Price: </strong>${getCurrencySymbol(storeCurrency)}${orignalPrice.toFixed(2)} </p>`;
+              template += `<p><strong>Discounted Price: </strong>${getCurrencySymbol(storeCurrency)}${discountedPrice.toFixed(2) }</p>`;
+              template += `<p><strong>You Save: </strong>${getCurrencySymbol(storeCurrency)}${youSave.toFixed(2) }</p>`;
+            }
+
+
+              
+           
+
+            template += `</div>`;
+
+            const domParser = new DOMParser();
+            const dom = domParser.parseFromString(template, "text/html");
+            li.appendChild(dom.querySelector(".accordion-header"));
+            li.appendChild(dom.querySelector(".accordion-content"));            
+            discountContainer.appendChild(li);  
+          });
+          document.querySelector(".app-product-discounts .product-deiscount-wrapper").style.display = "flex"; // Show the discount section
+          initAccordions();
+        } else {
+          console.log("No discounts available for this product.");
+          document.querySelector(".app-product-discounts .product-deiscount-wrapper").innerHTML = "<p>No discounts available for this product.</p>"; // Clear existing content
+          return;
+        }       
+      })
+      .catch(error => {
+        console.error("Error fetching discounted price:", error);
+      });
+  });
+
+  function initAccordions() {
+    document.querySelectorAll(".app-product-discounts .discount-accordions .accordion-item .accordion-header").forEach(header => {
+      header.addEventListener("click", () => {
+        const item = header.parentElement;
+  
+        // Close all others
+        document.querySelectorAll(".app-product-discounts .discount-accordions .accordion-item").forEach(i => {
+          if (i !== item) {
+            i.classList.remove("active");
+          }
+        });
+  
+        // Toggle current
+        item.classList.toggle("active");
+      });
+    });
+  }
+
+  function getCurrencySymbol (currency) {
+    return (0).toLocaleString(
+      'en-US',
+      {
+        style: 'currency',
+        currency: currency,
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      }
+    ).replace(/\d/g, '').trim()
+  }
+ 
+
+</script>
+
+{% schema %}
+{
+  "name": "Product Discounts",
+  "target": "section",
+  "tag":"div",
+  "available_if": "{{ app.metafields.productDiscounts.hasPlan }}",
+  "class": "app-product-discounts",
+  "settings": [
+    {
+      "type": "header",
+      "content": "Block Settings"
+    },
+    {
+      "type": "text",
+      "id": "title",
+      "label": "Block Title",
+      "default": "Products Discounts"
+    },
+    {
+      "type": "color",
+      "id": "bg_color",
+      "label": "Background Color",
+      "default": "#f5f5f5"
+    },
+    {
+      "type": "color",
+      "id": "title_color",
+      "label": "Title Color",
+      "default": "#333333"
+    },
+    {
+      "type": "header",
+      "content": "Discount List Settings"
+    },
+    {
+      "type": "color",
+      "id": "li_bg_color",
+      "label": "List Item Background Color",
+      "default": "#d1d1d1"
+    },
+    {
+      "type": "color",
+      "id": "li_bg_hover_color",
+      "label": "List Item Hover Background Color",
+      "default": "#aaa9a9"
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "Text Color",
+      "default": "#333333"
+    }
+  ],   
+}
+{% endschema %}
+

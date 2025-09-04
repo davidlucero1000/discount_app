@@ -1,0 +1,24 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "9ae41554c67d4e565eff92147253de94"
+name = "Discounts:Products Page"
+handle = "discounts-products-page"
+application_url = "https://advised-debate-animal-white.trycloudflare.com"
+embedded = true
+
+[build]
+automatically_update_urls_on_dev = true
+include_config_on_deploy = true
+
+[webhooks]
+api_version = "2025-04"
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "read_customers,read_discounts,write_products,read_themes"
+
+[auth]
+redirect_urls = ["https://advised-debate-animal-white.trycloudflare.com/auth/callback", "https://advised-debate-animal-white.trycloudflare.com/auth/shopify/callback", "https://advised-debate-animal-white.trycloudflare.com/api/auth/callback"]
+
+[pos]
+embedded = false
