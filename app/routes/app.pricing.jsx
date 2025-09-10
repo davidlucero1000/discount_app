@@ -54,7 +54,7 @@ export const action = async ({ request }) => {
   const planTitle = formData.get("plan");  
 
   let plan = STANDERED_PLAN;
-   console.log("Selected Plan:", planTitle);
+  //  console.log("Selected Plan:", planTitle);
   if (planTitle =="Standard") {
     plan = STANDERED_PLAN;
   }

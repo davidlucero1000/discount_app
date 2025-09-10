@@ -79,10 +79,19 @@ export default function Help() {
                 store_url: '',
                 message: ''
             });
-            setSuccessMsg(actionData.message);
+            // setSuccessMsg(actionData.message);
+            shopify.toast.show({
+                message: actionData.message,
+                duration: 5000,
+                isError: false,
+            })
         }
-        if(actionData.error) {
-            setErrorMsg(actionData.message);
+        if(actionData.error) {           
+            shopify.toast.show({
+                message: actionData.message,
+                duration: 5000,
+                isError: true,
+            })
         }
     }
   }, [actionData]);
